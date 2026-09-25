@@ -44,7 +44,7 @@ SIGS='UnboundGPT|JAILBREAK ?OK|reset your (personality|persona|rules)|ignore (al
 # ── Layer B: death-line-tripping commands hiding in scripts/ or mcp.json (what hook-security-deny blocks
 #    at RUN time — here we catch it at INSTALL time, before it ever runs) ──
 EXFIL_SINK='transfer\.sh|file\.io|0x0\.st|pastebin|hastebin|termbin|webhook\.site|requestbin|pipedream\.net|ngrok|burpcollaborator|oast\.'
-CRED_NAME='id_rsa|id_ed25519|id_macmini|\.ssh/id|refresh.?token|access.?token|client_secret|GOCSPX|ANTHROPIC_API|github_pat|BOT_TOKEN|api_key|\.atlas_oauth|gog_credentials|\.env\b'
+CRED_NAME='id_rsa|id_ed25519|\.ssh/id|refresh.?token|access.?token|client_secret|GOCSPX|ANTHROPIC_API|github_pat|BOT_TOKEN|api_key|oauth[-_]?token|gog_credentials|\.env\b'
 DANGER_CMD='curl|wget|nc |ncat|/dev/tcp|scp |chmod\s+[0-7]*[4-7][4-7]|rm\s+-[a-z]*rf|git\s+push.*--force|base64|openssl enc'
 
 hits_inj="$(grep -rniE "$SIGS" $TEXTFILES 2>/dev/null | head -12)"
@@ -104,7 +104,7 @@ if [ "$suspicious" -eq 1 ]; then
   echo "but a plugin that SHIPS them has already failed the trust test — reject the bundle.)"
 else
   echo "ℹ️  No injection/exfil/death-line signatures found. NOT a clearance to install:"
-  echo "   still do the FakeGit provenance-3-check (feedback-injection-defense §供应链):"
+  echo "   still do the provenance check by hand:"
   echo "   ① author handle char-by-char = official org?  ② canonical repo, not a look-alike?"
   echo "   ③ real stars/history, not a fresh clone?  Then FIRST run via sandbox-run.sh, lock versions."
 fi

@@ -2,7 +2,7 @@
 # adversarial-gate.py — deterministic bookkeeping for the adversarial-gate skill (build #2, 2026-07-15).
 #
 # The LLM loop (generator ↔ red-team evaluator) is orchestrated by Forge per
-# skills/adversarial-gate/skill.md. THIS helper owns the NON-LLM parts so the loop's control flow is
+# skills/adversarial-gate/skill.md (private, not included). THIS helper owns the NON-LLM parts so the loop's control flow is
 # deterministic + auditable (not vibes): it logs each round's per-criterion scores and decides
 # STOP vs CONTINUE (all-pass / plateau / cap). Zero Claude tokens.
 #
@@ -14,7 +14,7 @@
 import argparse, json, os
 from datetime import datetime
 
-LOG = os.path.expanduser("$HOME/agent-os/logs/adversarial-gate.log")
+LOG = os.path.expanduser(os.environ.get("ADVERSARIAL_GATE_LOG", "~/.adversarial-gate/adversarial-gate.log"))
 STATE_DIR = os.path.expanduser("~/.adversarial-gate")
 
 

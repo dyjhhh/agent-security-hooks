@@ -41,8 +41,8 @@ cat > "$SBX" <<EOF
   (subpath "$H/.aws")
   (regex #"^$H/\\.claude/\\.credentials")
   (regex #"(refresh|access).?token")
-  (regex #"/id_(rsa|dsa|ecdsa|ed25519|macmini)")
-  (regex #"(client_secret|GOCSPX|BOT_TOKEN|compass-pw|atlas_oauth|gog_credentials)")
+  (regex #"/id_(rsa|dsa|ecdsa|ed25519)")
+  (regex #"(client_secret|GOCSPX|BOT_TOKEN|site-pw|oauth[-_]?token|gog_credentials)")
   (regex #"\\.pem\$")
 )
 (deny file-write*

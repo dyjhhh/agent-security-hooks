@@ -13,8 +13,10 @@ LOG="${SECURITY_DENY_LOG:-$HOME/agent-os/logs/security-deny.log}"
 deny(){ mkdir -p "$(dirname "$LOG")" 2>/dev/null; echo "$(date -Iseconds) DENIED [$1]: $CMD" >>"$LOG"
   echo "🛑 BLOCKED by security guard ($1): matches an exfiltration/destructive pattern never used in legit work. If you (the real user) truly intend this, run it yourself in a terminal." >&2; exit 2; }
 
-# Colon-separated override exists only for isolated unit tests. Production uses these roots.
-PROTECTED_ROOTS="${AGENT_GUARD_PROTECTED_ROOTS:-$HOME/agent-os/memory:~/agent-os/memory:$HOME/.claude/projects/-project/memory:$HOME/context-portfolio:$HOME/Personal:$HOME/Documents:$HOME/Desktop:$HOME/Library/CloudStorage/GoogleDrive-<redacted-account>@franchise.the venue business.com/My Drive/VENUE-the city:$HOME/.local/state/operator-agent-guard:$HOME/.claude/settings.json:$HOME/agent-os/.claude/settings.json:$HOME/agent-os/security/hook-security-deny.sh:$HOME/agent-os/security/hook-protected-write-guard.sh}"
+# Default protected roots. Setting the colon-separated AGENT_GUARD_PROTECTED_ROOTS replaces this list;
+# the tests point it at temporary directories.
+# Private deployments pass their full list, including site-specific roots, through AGENT_GUARD_PROTECTED_ROOTS.
+PROTECTED_ROOTS="${AGENT_GUARD_PROTECTED_ROOTS:-$HOME/agent-os/memory:~/agent-os/memory:$HOME/.claude/projects/-project/memory:$HOME/context-portfolio:$HOME/Personal:$HOME/Documents:$HOME/Desktop:$HOME/.local/state/operator-agent-guard:$HOME/.claude/settings.json:$HOME/agent-os/.claude/settings.json:$HOME/agent-os/security/hook-security-deny.sh:$HOME/agent-os/security/hook-protected-write-guard.sh}"
 
 references_protected_path() {
   local old_ifs root
@@ -33,8 +35,6 @@ references_protected_path() {
   # hook cwd is the agent-os repo or when the command explicitly cd's there.
   printf '%s' "$CMD" | grep -qE '(~/|\$HOME/)(agent-os/(agent-os/)?memory|agent-os/memory|\.claude/projects/-project/memory|context-portfolio|Personal|Documents|Desktop|\.local/state/operator-agent-guard|\.claude/settings\.json)(/|[[:space:]"'"'"']|$)' \
     && return 0
-  printf '%s' "$CMD" | grep -qE '(~/|\$HOME/)Library/CloudStorage/GoogleDrive-operator\.<name>@franchise\.the venue business\.com/My Drive/VENUE-the city(/|[[:space:]"'"'"']|$)' \
-    && return 0
   case "$CWD" in
     "$HOME/agent-os"|"$HOME/agent-os"/*)
       printf '%s' "$CMD" | grep -qE '(^|[[:space:]"'"'"'=])(memory|agent-os/memory)(/|[[:space:]"'"'"']|$)' && return 0
@@ -47,13 +47,13 @@ references_protected_path() {
 
 # 1. credential read embedded in / piped to network egress
 echo "$CMD" | grep -qiE '(curl|wget|nc |ncat|telnet|/dev/tcp).*(\$\(|`).*(cat|grep|head|tail|base64|xxd|openssl|cut)' \
-  && echo "$CMD" | grep -qiE '(id_macmini|id_rsa|id_ed25519|\.ssh/id|\.env|refresh.?token|access.?token|client_secret|\.atlas_oauth|gog_credentials|CLIENT_SECRET|GOCSPX|ANTHROPIC_API|github_pat|BOT_TOKEN|api_key)' \
+  && echo "$CMD" | grep -qiE '(id_rsa|id_ed25519|\.ssh/id|\.env|refresh.?token|access.?token|client_secret|oauth[-_]?token|gog_credentials|CLIENT_SECRET|GOCSPX|ANTHROPIC_API|github_pat|BOT_TOKEN|api_key)' \
   && deny "cred-exfil-network"
-echo "$CMD" | grep -qiE '(cat|grep|base64|xxd|openssl|cut)\b.*(id_macmini|id_rsa|id_ed25519|\.ssh/id|\.env\b|refresh.?token|access.?token|client_secret|\.atlas_oauth|gog_credentials|CLIENT_SECRET|github_pat|BOT_TOKEN)' \
+echo "$CMD" | grep -qiE '(cat|grep|base64|xxd|openssl|cut)\b.*(id_rsa|id_ed25519|\.ssh/id|\.env\b|refresh.?token|access.?token|client_secret|oauth[-_]?token|gog_credentials|CLIENT_SECRET|github_pat|BOT_TOKEN)' \
   && echo "$CMD" | grep -qiE '\|\s*(curl|wget|nc |ncat|telnet)' && deny "cred-pipe-network"
 
 # 2. chmod loosening perms on sensitive files
-echo "$CMD" | grep -qiE 'chmod\s+([0-7]?[0-7][4-7][4-7]\b|\+r\b|a\+r|o\+r|g\+r).*(\.ssh|id_macmini|id_rsa|id_ed25519|\.env\b|refresh.?token|client_secret|gog_credentials|\.atlas_oauth|\.gmail)' \
+echo "$CMD" | grep -qiE 'chmod\s+([0-7]?[0-7][4-7][4-7]\b|\+r\b|a\+r|o\+r|g\+r).*(\.ssh|id_rsa|id_ed25519|\.env\b|refresh.?token|client_secret|gog_credentials|oauth[-_]?token|\.gmail)' \
   && deny "chmod-loosen-secret"
 
 # 3. git force-push (never legit in synced multi-agent setup)
@@ -71,7 +71,7 @@ printf '%s' "$CMD" | grep -qiE 'git[[:space:]]+clean\b' \
   && deny "git-destructive-clean"
 
 # 4. kill agent-critical daemons (disable oversight)
-echo "$CMD" | grep -qiE '(pkill|killall|kill)\b.*(the always-on runtime|atlas_sync|auto-sync|telegram-watchdog|intelligent-heartbeat|atlas_recovery|codex-bridge)' \
+echo "$CMD" | grep -qiE '(pkill|killall|kill)\b.*(agent-runtime|agent-sync|auto-sync|telegram-watchdog|intelligent-heartbeat|agent-recovery|codex-bridge)' \
   && deny "kill-critical-daemon"
 
 # 5. rm -rf of home root or system root
