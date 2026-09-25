@@ -1,0 +1,10 @@
+*.log
+*.out
+.DS_Store
+__pycache__/
+*.pyc
+.env
+.creds
+*.token
+.telegram-creds
+/tmp/

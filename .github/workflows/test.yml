@@ -1,0 +1,18 @@
+name: tests
+on:
+  push: { branches: [main] }
+  pull_request:
+  schedule:
+    - cron: "17 13 * * 1"
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install poppler (the screen shells out to pdftotext)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+      - name: Containment and guard tests
+        run: make test
+      - name: Sensitivity scan
+        run: make scan
