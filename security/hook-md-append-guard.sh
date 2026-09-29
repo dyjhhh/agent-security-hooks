@@ -15,9 +15,10 @@ export PATH="/opt/homebrew/bin:/usr/bin:/bin:$PATH"
 # information" about a contact already documented at length.
 #
 # ── THE FIX ───────────────────────────────────────────────────────────────────
-# FIRST append to a given canonical .md IN A GIVEN SESSION → DENY once, and hand back that file's
-# tail so the agent physically cannot write without seeing current state. Subsequent appends to the
-# SAME file in the SAME session → pass through silently (the read already happened).
+# FIRST `>>` append to a given canonical .md IN A GIVEN SESSION → DENY once, and hand back that file's
+# tail, so the retry comes after the current state was shown to the agent. Subsequent appends to the
+# SAME file in the SAME session → pass through silently. Other write paths (`>`, tee, python, a
+# basename not under ROOTS) and any parse failure are not covered; see FAIL-OPEN below.
 # Cost: one extra round-trip per file per session. That is the whole price.
 #
 # Scope: ONLY Bash `>>` appends. Write/Edit/MultiEdit already force a prior Read at the tool layer,
@@ -32,7 +33,8 @@ command -v jq >/dev/null 2>&1 || exit 0
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
 [ -z "$CMD" ] && exit 0
 
-# Only care about append redirection. `>` (truncate) is handled by hook-protected-write-guard.sh.
+# Only care about append redirection. Shell `>` truncation is not checked here or by
+# hook-protected-write-guard.sh, which sees Write/Edit tool calls only.
 printf '%s' "$CMD" | grep -q '>>' || exit 0
 
 SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // "nosess"' 2>/dev/null)

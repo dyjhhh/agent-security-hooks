@@ -31,19 +31,19 @@ the documentation does not claim that malformed input is denied.
 
 ## Layer three: screening before reading
 
-- `security/pdf-screen.sh` converts a PDF to text (an agent never opens a PDF directly), scans it for injection signatures (fake system tags, jailbreak phrasing, exfiltration URLs) and banners the text as untrusted before any model sees it. PDF screening is a precaution: this system has had one suspected injection, and a later review of the transcript found no attacker payload.
+- `security/pdf-screen.sh` converts a PDF to text with `pdftotext` run through `security/sandbox-run.sh` (it refuses to parse if the wrapper is missing or not executable), strips zero-width and bidi control characters, scans for injection signatures (fake system tags, jailbreak phrasing, imperative send or upload instructions, instructions to rank a resume first) and banners the text as untrusted. Standing instructions route PDFs through this script; nothing in this repository enforces that. PDF screening is a precaution: this system has had one suspected injection, and a later review of the transcript found no attacker payload.
 - `security/plugin-screen.sh` runs before any third-party plugin or skill is installed. It statically scans the bundle's text files for injection phrasing, exfiltration sinks, credential names near network calls and destructive commands, and it runs nothing from the bundle. Provenance, a character-level look at the author handle and a first run under `security/sandbox-run.sh` remain manual steps that the script prints as a checklist. Registries are not endorsements.
-- `security/sandbox-run.sh` runs untrusted code under macOS Seatbelt with network access denied and access to common secret locations (SSH, GPG and AWS directories, token and key files) denied; the rest of the filesystem stays available. It fails closed if the profile cannot be applied.
+- `security/sandbox-run.sh` runs a command under an allow-by-default macOS Seatbelt profile (`sandbox-exec`) that denies network access, reads of SSH, GPG and AWS directories and token- or key-named files, and writes to `~/.ssh` and `~/.claude`. Other reads and writes, process execution and inherited environment variables are not restricted. It exits without running the command if `sandbox-exec` is missing or the profile fails to load. It is not covered by `make test`; CI runs on Linux.
 
 ## Layer four: write guards
 
 - `security/hook-protected-write-guard.sh` snapshots a protected file before a Write or Edit and blocks a single edit that would shrink a file of at least 1 KB to less than half its size, which forces a large rewrite into reviewable steps.
 - `security/hook-md-append-guard.sh` denies the first shell append to a canonical Markdown file in each session and returns that file's current tail, so the agent reads current state before writing; the retry goes through. It is a forced read, not a semantic check for stale or duplicate claims.
-- `security/adversarial-gate.py` records each round of the red-stakes review loop and decides when the loop stops; the model loop itself is private. It is described in the [eval harness](https://github.com/dyjhhh/agent-eval-gates/blob/main/docs/eval-harness.md).
+- `security/adversarial-gate.py` records each round of the red-stakes review loop and decides when the loop stops; it is a review-loop helper, not an access control, and the model loop itself is private. It is described in the [eval harness](https://github.com/dyjhhh/agent-eval-gates/blob/main/docs/eval-harness.md).
 
 ## Secrets
 
-In this copy every secret is an environment variable, such as `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+No script in this repository reads a secret or token. Site-specific paths are passed through environment variables such as `AGENT_GUARD_PROTECTED_ROOTS` and `AGENT_GUARD_STATE_ROOT`.
 
 ## How this repository was produced
 
@@ -60,20 +60,30 @@ Four layers between untrusted content and a consequential action. Doctrine in [d
 
 | File | What it does |
 |---|---|
-| `security/hook-security-deny.sh` | PreToolUse guard on every shell command: exfiltration, credential reads, destructive git, protected-path deletes and moves, killing oversight daemons, recursive home deletes, permission changes, secret-shaped strings. Refuses with a reason |
-| `security/pdf-screen.sh` | Converts a PDF to text and screens it for injection signatures before any agent reads it; banners the text as untrusted |
-| `security/plugin-screen.sh` | Static scan before install; prints the manual provenance checklist; runs nothing |
-| `security/sandbox-run.sh` | No network, secret paths denied; fails closed |
-| `security/hook-protected-write-guard.sh` | Blocks a single edit that shrinks a file of 1 KB or more below half |
-| `security/hook-md-append-guard.sh` | Denies the first shell append once and returns the file's tail; a forced read, not a staleness check |
-| `security/adversarial-gate.py` | Records each round of the red-stakes review loop and decides when it stops; the model loop is private |
+| [`security/hook-security-deny.sh`](security/hook-security-deny.sh) | Bash PreToolUse pattern guard: credential names or PII shapes sent to network commands, uploads to paste/webhook sinks, destructive git, protected-path deletes and moves, killing named daemons, recursive home deletes, loosening permissions on secret files. Fail-open on parse errors; see coverage limits above |
+| [`security/pdf-screen.sh`](security/pdf-screen.sh) | Converts a PDF to text inside the sandbox wrapper and screens it for injection signatures; banners the text as untrusted |
+| [`security/plugin-screen.sh`](security/plugin-screen.sh) | Static scan before install; prints the manual provenance checklist; runs nothing |
+| [`security/sandbox-run.sh`](security/sandbox-run.sh) | macOS Seatbelt wrapper, allow-by-default: no network, reads of listed secret paths denied; refuses to run if the profile cannot load |
+| [`security/hook-protected-write-guard.sh`](security/hook-protected-write-guard.sh) | Snapshots protected files before Write/Edit; blocks a single edit that shrinks a file of 1 KB or more below half |
+| [`security/hook-md-append-guard.sh`](security/hook-md-append-guard.sh) | Denies the first shell append once and returns the file's tail; a forced read, not a staleness check |
+| [`security/adversarial-gate.py`](security/adversarial-gate.py) | Records each round of the red-stakes review loop and decides when it stops; a review-loop helper, not a security control. The model loop is private |
 
 
 ## Run
 
-`make test` runs the PDF-screen containment test, the guard regression test (deny hook, protected-write guard and append guard, all against temporary directories) and the scanner's own tests. `make scan` runs the public sensitivity scan.
+Requires bash, jq, python3 and pdftotext (poppler). `make test` runs three suites (51 checks on 2026-09-28): [`tests/test_pdf_screen.sh`](tests/test_pdf_screen.sh) (23; the sandbox wrapper is a stub, so it checks refusal without the wrapper, temp-file cleanup, Unicode normalization and signature hits, not Seatbelt itself), [`tests/test_guard_regressions.sh`](tests/test_guard_regressions.sh) (23; protected-path deletes and moves, destructive git, daemon kill, the shrink block, snapshots and the append guard, all against temporary directories) and [`tools/test_sensitivity_scan.py`](tools/test_sensitivity_scan.py) (5). Not covered by tests: the deny hook's credential and PII exfiltration, upload-sink, force-push, chmod and home-root delete patterns, `sandbox-run.sh`, `plugin-screen.sh` and `adversarial-gate.py`. `make scan` runs the public sensitivity scan.
 
-Designed and built by Yujia Dong, using Claude Code and Codex as coding tools. Codex helped write the public extraction and tests; design choices and review are mine.
+Safe example (the hook only inspects the string; nothing is deleted):
+
+```bash
+echo '{"tool_name":"Bash","cwd":"/tmp","tool_input":{"command":"rm /tmp/demo-protected/notes.md"}}' \
+  | AGENT_GUARD_PROTECTED_ROOTS=/tmp/demo-protected SECURITY_DENY_LOG=/dev/null \
+    bash security/hook-security-deny.sh; echo "exit $?"   # BLOCKED (protected-path-delete), exit 2
+```
+
+On macOS, `bash security/sandbox-run.sh /usr/bin/python3 -c 'import socket; socket.create_connection(("127.0.0.1", 9), timeout=2)'` fails with `PermissionError: [Errno 1] Operation not permitted`; without the wrapper the same call fails with `ConnectionRefusedError`.
+
+Personal project by Yujia Dong · AI-assisted development. Design choices and review are mine; Claude Code and Codex assisted with implementation, including the public extraction and tests.
 
 ## License
 

@@ -14,7 +14,7 @@ PDF="${1:-}"
 [ -f "$PDF" ] || { echo "pdf-screen: no such file: $PDF"; exit 2; }
 
 # OS-level containment (agent-OS #4): parse the UNTRUSTED PDF inside a macOS Seatbelt sandbox — no
-# network (a malicious PDF exploiting a poppler CVE cannot exfil) + no secret reads. The wrapper is
+# network for the parser + reads of the listed secret paths denied (limits in sandbox-run.sh). The wrapper is
 # a mandatory security boundary: if it is absent or not executable, refuse to parse the PDF.
 SANDBOX="$(cd "$(dirname "$0")" && pwd)/sandbox-run.sh"
 [ -f "$SANDBOX" ] && [ -x "$SANDBOX" ] || {

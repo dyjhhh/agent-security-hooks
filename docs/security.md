@@ -25,19 +25,19 @@ the documentation does not claim that malformed input is denied.
 
 ## Layer three: screening before reading
 
-- `security/pdf-screen.sh` converts a PDF to text (an agent never opens a PDF directly), scans it for injection signatures (fake system tags, jailbreak phrasing, exfiltration URLs) and banners the text as untrusted before any model sees it. PDF screening is a precaution: this system has had one suspected injection, and a later review of the transcript found no attacker payload.
+- `security/pdf-screen.sh` converts a PDF to text with `pdftotext` run through `security/sandbox-run.sh` (it refuses to parse if the wrapper is missing or not executable), strips zero-width and bidi control characters, scans for injection signatures (fake system tags, jailbreak phrasing, imperative send or upload instructions, instructions to rank a resume first) and banners the text as untrusted. Standing instructions route PDFs through this script; nothing in this repository enforces that. PDF screening is a precaution: this system has had one suspected injection, and a later review of the transcript found no attacker payload.
 - `security/plugin-screen.sh` runs before any third-party plugin or skill is installed. It statically scans the bundle's text files for injection phrasing, exfiltration sinks, credential names near network calls and destructive commands, and it runs nothing from the bundle. Provenance, a character-level look at the author handle and a first run under `security/sandbox-run.sh` remain manual steps that the script prints as a checklist. Registries are not endorsements.
-- `security/sandbox-run.sh` runs untrusted code under macOS Seatbelt with network access denied and access to common secret locations (SSH, GPG and AWS directories, token and key files) denied; the rest of the filesystem stays available. It fails closed if the profile cannot be applied.
+- `security/sandbox-run.sh` runs a command under an allow-by-default macOS Seatbelt profile (`sandbox-exec`) that denies network access, reads of SSH, GPG and AWS directories and token- or key-named files, and writes to `~/.ssh` and `~/.claude`. Other reads and writes, process execution and inherited environment variables are not restricted. It exits without running the command if `sandbox-exec` is missing or the profile fails to load. It is not covered by `make test`; CI runs on Linux.
 
 ## Layer four: write guards
 
 - `security/hook-protected-write-guard.sh` snapshots a protected file before a Write or Edit and blocks a single edit that would shrink a file of at least 1 KB to less than half its size, which forces a large rewrite into reviewable steps.
 - `security/hook-md-append-guard.sh` denies the first shell append to a canonical Markdown file in each session and returns that file's current tail, so the agent reads current state before writing; the retry goes through. It is a forced read, not a semantic check for stale or duplicate claims.
-- `security/adversarial-gate.py` records each round of the red-stakes review loop and decides when the loop stops; the model loop itself is private. It is described in the [eval harness](https://github.com/dyjhhh/agent-eval-gates/blob/main/docs/eval-harness.md).
+- `security/adversarial-gate.py` records each round of the red-stakes review loop and decides when the loop stops; it is a review-loop helper, not an access control, and the model loop itself is private. It is described in the [eval harness](https://github.com/dyjhhh/agent-eval-gates/blob/main/docs/eval-harness.md).
 
 ## Secrets
 
-In this copy every secret is an environment variable, such as `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+No script in this repository reads a secret or token. Site-specific paths are passed through environment variables such as `AGENT_GUARD_PROTECTED_ROOTS` and `AGENT_GUARD_STATE_ROOT`.
 
 ## How this repository was produced
 

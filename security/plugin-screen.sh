@@ -9,7 +9,7 @@
 # a bundle whose SKILL.md is attacker-authored data and whose scripts/ or mcp.json quietly bypass the
 # death-line. Codex (one of the operator's own agents) IS a supporting client → the vector is not hypothetical.
 #
-# This turns "confirm it doesn't bypass hook-security-deny" from a hope into a deterministic gate.
+# This adds a deterministic static pattern scan before install; a clean result does not prove the bundle is safe.
 # Sibling of pdf-screen.sh. No LLM. Reads only; installs nothing; runs nothing from the bundle.
 #
 # Usage: plugin-screen.sh <plugin-dir | plugin.zip>
@@ -100,7 +100,7 @@ if [ "$suspicious" -eq 1 ]; then
   [ -n "$hits_cred" ]   && { echo "• secret-name NEAR network/exfil (credential theft shape):"; printf '%s' "$hits_cred"; }
   [ -n "$hits_sink" ]   && { echo "• exfil sinks (paste/webhook/tunnel):"; echo "$hits_sink" | sed 's/^/    /'; }
   [ -n "$hits_danger" ] && { echo "• death-line-class commands in bundle:"; echo "$hits_danger" | sed 's/^/    /'; }
-  echo "Quote a hit back to the operator + do NOT proceed. (hook-security-deny still blocks these at run time,"
+  echo "Quote a hit back to the operator + do NOT proceed. (hook-security-deny inspects only agent shell commands, not code the plugin runs;"
   echo "but a plugin that SHIPS them has already failed the trust test — reject the bundle.)"
 else
   echo "ℹ️  No injection/exfil/death-line signatures found. NOT a clearance to install:"
