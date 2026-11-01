@@ -1,14 +1,21 @@
 # Agent Security Hooks
 
 **Problem:** coding agents read web pages, PDFs and pasted text that can contain instructions they should not follow.\
-**What it shows:** safety as layered, deterministic guards with regression tests and written coverage limits, not a claim of complete protection.\
+**What it shows:** guardrails for coding agents that state their limits. The deny hook fails open on parse errors and this README says so; 51 regression checks back the rest.\
 **Run it in about 60 seconds:** clone, then `make test` (bash, jq, python3 and pdftotext from poppler).
 
 [![tests](https://github.com/dyjhhh/agent-security-hooks/actions/workflows/test.yml/badge.svg)](https://github.com/dyjhhh/agent-security-hooks/actions/workflows/test.yml)
 
+## Applying this on an engineering team
+
+- **One policy for every engineer's coding agent.** Ship the PreToolUse deny hook in shared agent configuration, so destructive git commands and protected-path deletes are refused the same way on every machine.
+- **Screen untrusted input before an agent reads it.** PDFs are converted inside a sandbox wrapper, hidden control characters are stripped, and the text is bannered as untrusted ([`security/pdf-screen.sh`](security/pdf-screen.sh)).
+- **A regression test per blocked pattern.** The guard tests run against temporary directories, so a policy edit that reopens a hole fails CI ([`tests/test_guard_regressions.sh`](tests/test_guard_regressions.sh)).
+- **Written coverage limits.** What the hook does not inspect is documented next to the policy, so reviewers know which actions still need human approval.
+
 Untrusted content is data: a deterministic deny hook, PDF and plugin screening, sandboxed execution, and write guards for coding agents.
 
-Part of [Personal Agent OS](https://github.com/dyjhhh/agent-os), the three-agent personal system I use every day. The principles it follows are in [docs/principles.md](https://github.com/dyjhhh/agent-os/blob/main/docs/principles.md); the architecture is in [docs/architecture.md](https://github.com/dyjhhh/agent-os/blob/main/docs/architecture.md).
+Part of [Personal Agent OS](https://github.com/dyjhhh/agent-os), the three-agent harness I run every day. The principles it follows are in [docs/principles.md](https://github.com/dyjhhh/agent-os/blob/main/docs/principles.md); the architecture is in [docs/architecture.md](https://github.com/dyjhhh/agent-os/blob/main/docs/architecture.md).
 
 ## The doctrine
 
