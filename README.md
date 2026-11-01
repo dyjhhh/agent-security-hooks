@@ -73,7 +73,7 @@ Four layers between untrusted content and a consequential action. Doctrine in [d
 
 Requires bash, jq, python3 and pdftotext (poppler). `make test` runs three suites (51 checks on 2026-09-28): [`tests/test_pdf_screen.sh`](tests/test_pdf_screen.sh) (23; the sandbox wrapper is a stub, so it checks refusal without the wrapper, temp-file cleanup, Unicode normalization and signature hits, not Seatbelt itself), [`tests/test_guard_regressions.sh`](tests/test_guard_regressions.sh) (23; protected-path deletes and moves, destructive git, daemon kill, the shrink block, snapshots and the append guard, all against temporary directories) and [`tools/test_sensitivity_scan.py`](tools/test_sensitivity_scan.py) (5). Not covered by tests: the deny hook's credential and PII exfiltration, upload-sink, force-push, chmod and home-root delete patterns, `sandbox-run.sh`, `plugin-screen.sh` and `adversarial-gate.py`. `make scan` runs the public sensitivity scan.
 
-Safe example (the hook only inspects the string; nothing is deleted):
+Safe example, also available as `make demo` (the hook only inspects the string; nothing is deleted):
 
 ```bash
 echo '{"tool_name":"Bash","cwd":"/tmp","tool_input":{"command":"rm /tmp/demo-protected/notes.md"}}' \
