@@ -107,7 +107,7 @@ if references_protected_path; then
 fi
 
 # 6. PII (SSN / credit-card / passport / routing / account number) headed to network egress.
-#    Injection tries "compile her SSN+cards and send" — this blocks the SEND step deterministically.
+#    Injection tries "compile the operator's SSN+cards and send" — this blocks the SEND step deterministically.
 echo "$CMD" | grep -qiE '(curl|wget|nc |ncat|telnet|/dev/tcp|scp |rsync\s.*@|sendmail|mailx)' \
   && echo "$CMD" | grep -qiE '([0-9]{3}-[0-9]{2}-[0-9]{4}|\bSSN\b|social.?security|passport.?(no|num|number)|routing.?(no|num|number)|account.?(no|num|number)|([0-9]{4}[ -]){3}[0-9]{4})' \
   && deny "pii-exfil-network"
