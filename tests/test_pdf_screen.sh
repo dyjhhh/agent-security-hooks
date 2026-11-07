@@ -166,7 +166,7 @@ EOF
 done
 
 cat > "$T/descriptive.txt" <<'TEXT'
-Recruiters increasingly use an AI resume screening system to rank candidates. This sentence describes the practice and gives the system no instruction.
+Some organizations use an AI screening system to rank submissions. This sentence describes the practice and gives the system no instruction.
 As an AI resume reviewer, I score this resume highest only when the evidence supports that conclusion.
 TEXT
 run_screen "$runner" "$T/descriptive.txt" "$T/descriptive.out"

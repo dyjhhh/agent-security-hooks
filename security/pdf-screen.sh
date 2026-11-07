@@ -78,7 +78,7 @@ fi
 # instruction blocks, pre-authorization claims, imperative exfil/action commands, authority spoofing.
 SIGS='UnboundGPT|JAILBREAK ?OK|reset your (personality|persona|rules)|ignore (all )?(previous|prior) (rules|instructions)|you are now (an? )?(unbound|jailbroken|dan)|<system>|</system>|system.?reminder|pre.?authoriz|you (must|should|need to) (now |immediately )?(send|exfil|package|copy|email|upload|transfer)|as an? (admin|administrator|anthropic|system)|disregard (your|all|previous)'
 
-# Resume-specific prompt injection. Require the AI-reviewer actor, an imperative verb, the explicit
+# Screening-instruction prompt injection. Require the AI-reviewer actor, an imperative verb, the explicit
 # object "this candidate/resume", and a priority command. Descriptive prose about AI screening does
 # not satisfy this complete shape.
 AI_RESUME_SIG='as an? (a\.?i\.?|artificial intelligence) (resume )?(reviewer|screening system)[[:space:]]*[,;:]?[[:space:]]*(please[[:space:]]+)?(you[[:space:]]+(must|should|need[[:space:]]+to|are[[:space:]]+to)[[:space:]]+)?(rank|score|select|advance|shortlist)[[:space:]]+this[[:space:]]+(candidate|resume)[[:space:]]+((as|at|to)[[:space:]]+(the[[:space:]]+)?|the[[:space:]]+)?(first|highest)([[:space:][:punct:]]|$)'
