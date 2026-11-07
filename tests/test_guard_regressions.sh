@@ -116,6 +116,34 @@ else
   fail "second append was blocked again"
 fi
 
+append_reason() { # session, file name -> the denial reason text, empty when allowed
+  jq -cn --arg s "$1" --arg c "echo update >> $2" '{session_id:$s,tool_name:"Bash",tool_input:{command:$c}}' \
+    | bash "$APPEND_HOOK" 2>/dev/null | jq -r '.hookSpecificOutput.permissionDecisionReason // empty' 2>/dev/null
+}
+MEM="$FAKE_HOME/agent-os/memory"
+{ printf -- '---\norder: newest-first\n---\n'; for i in $(seq 1 60); do printf 'entry-%s\n' "$i"; done; } > "$MEM/latest-first.md"
+reason=$(append_reason s2 latest-first.md)
+if printf '%s' "$reason" | grep -q 'entry-1$' && ! printf '%s' "$reason" | grep -q 'entry-60' \
+  && printf '%s' "$reason" | grep -q 'insert new entries at the head'; then
+  pass "newest-first file -> deny with the head, not the tail"
+else
+  fail "newest-first file did not get its head"
+fi
+{ printf '## 2026-10-20 newer\nnew-entry\n'; printf '## 2026-09-01 older\n'; for i in $(seq 1 40); do printf 'old-%s\n' "$i"; done; } > "$MEM/unmarked.md"
+reason=$(append_reason s3 unmarked.md)
+if printf '%s' "$reason" | grep -q 'new-entry' && printf '%s' "$reason" | grep -q 'NO order MARKER'; then
+  pass "unmarked file -> direction guessed from dated headings and the denial says so"
+else
+  fail "unmarked file was not guessed newest-first with a warning"
+fi
+{ printf '<!-- order: append -->\n'; for i in $(seq 1 40); do printf 'row-%s\n' "$i"; done; } > "$MEM/marked-append.md"
+reason=$(append_reason s4 marked-append.md)
+if printf '%s' "$reason" | grep -q 'row-40' && ! printf '%s' "$reason" | grep -q 'NO order MARKER'; then
+  pass "line-1 marker append -> tail, no guess warning"
+else
+  fail "line-1 append marker not honoured"
+fi
+
 echo
 echo "Results: $passed passed, $failed failed"
 [ "$failed" -eq 0 ]

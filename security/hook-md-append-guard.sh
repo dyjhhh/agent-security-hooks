@@ -2,6 +2,7 @@
 export PATH="/opt/homebrew/bin:/usr/bin:/bin:$PATH"
 # hook-md-append-guard.sh — PreToolUse(Bash) READ-BEFORE-APPEND guard for canonical .md files.
 # Built 2026-07-31 by Forge, at the operator's explicit request, as the STRUCTURAL fix for a real failure.
+# Direction-aware since 2026-10-24, after a second failure (see WHICH END IS NEWEST).
 #
 # ── THE FAILURE THIS EXISTS TO PREVENT ────────────────────────────────────────
 # In one long session Forge appended to topic-B.md 8 times (hundreds of lines) and NEVER ONCE read
@@ -16,10 +17,19 @@ export PATH="/opt/homebrew/bin:/usr/bin:/bin:$PATH"
 #
 # ── THE FIX ───────────────────────────────────────────────────────────────────
 # FIRST `>>` append to a given canonical .md IN A GIVEN SESSION → DENY once, and hand back that file's
-# tail, so the retry comes after the current state was shown to the agent. Subsequent appends to the
+# newest region, so the retry comes after the current state was shown to the agent. Subsequent appends to the
 # SAME file in the SAME session → pass through silently. Other write paths (`>`, tee, python, a
 # basename not under ROOTS) and any parse failure are not covered; see FAIL-OPEN below.
 # Cost: one extra round-trip per file per session. That is the whole price.
+#
+# ── WHICH END IS NEWEST (2026-10-24) ──────────────────────────────────────────
+# The first version always returned the last 35 lines and said "later = newer". Many canonical files
+# are newest-first, so for them it returned the OLDEST region as current. An agent then answered from
+# the tail of such a file and reported an entry weeks old as the latest, while the newer ones sat at
+# the top. Each file now declares its order: `order: newest-first | append | mixed` as a frontmatter
+# key, or `<!-- order: ... -->` on line 1. newest-first → first 35 lines after the frontmatter, and
+# "insert at the head"; append → last 35 lines; mixed → first 20 and last 20, and "compare dates".
+# No marker → a guess from dated `## YYYY-MM-DD` headings, and the denial SAYS it is a guess.
 #
 # Scope: ONLY Bash `>>` appends. Write/Edit/MultiEdit already force a prior Read at the tool layer,
 # so they need no guard here.
@@ -69,17 +79,45 @@ done
 
 [ -z "$UNREAD" ] && exit 0
 
-# Build the denial reason: current tail of each first-touch file.
+# One awk pass per file → "<order> <lines-to-skip> <marker|guess>". A frontmatter `order:` key or a
+# line-1 comment wins; otherwise the position of the newest dated heading decides.
+probe_order() {
+  awk '
+    NR == 1 && /^---[[:space:]]*$/ { infm = 1; next }
+    NR == 1 && match($0, /<!--[[:space:]]*order:[[:space:]]*[a-z-]+[[:space:]]*-->/) {
+      v = substr($0, RSTART, RLENGTH); gsub(/<!--[[:space:]]*order:[[:space:]]*|[[:space:]]*-->/, "", v)
+      mk = v; skip = 1
+    }
+    infm == 1 {
+      if ($0 ~ /^---[[:space:]]*$/) { infm = 2; skip = NR; mk = fm }
+      else if (NR > 30) infm = 0
+      else if ($0 ~ /^order:[[:space:]]*[a-z-]+[[:space:]]*$/) { fm = $0; sub(/^order:[[:space:]]*/, "", fm); sub(/[[:space:]]+$/, "", fm) }
+    }
+    /^#+[ \t]+[^A-Za-z0-9]*20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ {
+      match($0, /20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/); d = substr($0, RSTART, RLENGTH)
+      if (++n == 1) first = d
+      if (d > max) max = d
+      last = d
+    }
+    END {
+      if (mk == "newest-first" || mk == "append" || mk == "mixed") { print mk, skip + 0, "marker"; exit }
+      h = (n < 2 || last == max) ? "append" : (first == max) ? "newest-first" : "mixed"
+      print h, skip + 0, "guess"
+    }' "$1" 2>/dev/null
+}
+
+# Build the denial reason: the newest region of each first-touch file.
 REASON="🔒 READ-BEFORE-APPEND GUARD — first append to this canonical file in this session.
 
 WHY: appending without reading is how stale mid-file plans get quoted as current, how day/date
-counters drift, and how already-documented facts get announced as 'new'. Below is the CURRENT tail
-of each file. Read it, reconcile your intended write against it, then re-issue the same command —
-it will go through unblocked this time (per file, per session).
+counters drift, and how already-documented facts get announced as 'new'. Below is the NEWEST region
+of each file; which end that is comes from the file's order. Read it, reconcile your intended write
+against it, then re-issue the same command; it will go through unblocked this time (per file, per
+session). For a newest-first file, insert at the head instead of re-issuing the append.
 
 CHECK BEFORE YOU RE-ISSUE:
-  1. Does the tail already contain what you were about to write? (then don't duplicate it)
-  2. Does the tail CONTRADICT it? (the tail is newer — .md files are append-ordered, later = newer)
+  1. Does the excerpt already contain what you were about to write? (then don't duplicate it)
+  2. Does the excerpt CONTRADICT it? (the excerpt is the newest region; never assume tail = newer)
   3. Any date / day-count / quantity / amount in your write: did it come from THIS FILE, or from the
      conversation? Conversation-sourced numbers are the ones that drift. Re-derive from the file.
 "
@@ -88,9 +126,27 @@ IFS='|'
 for f in $UNREAD; do
   [ -z "$f" ] && continue
   total=$(wc -l < "$f" 2>/dev/null | tr -d ' ')
+  IFS=' ' read -r order skip src <<PROBE
+$(probe_order "$f")
+PROBE
+  case $skip in ''|*[!0-9]*) skip=0 ;; esac
+  case "$order" in
+    newest-first)
+      excerpt=$(sed -n "$((skip + 1)),$((skip + 35))p" "$f" 2>/dev/null)
+      label="order: newest-first · first 35 lines after the frontmatter · insert new entries at the head" ;;
+    mixed)
+      excerpt="$(sed -n "$((skip + 1)),$((skip + 20))p" "$f" 2>/dev/null)
+⋯
+$(tail -20 "$f" 2>/dev/null)"
+      label="order: mixed · first 20 and last 20 lines · compare the dates before trusting either end" ;;
+    *)
+      excerpt=$(tail -35 "$f" 2>/dev/null)
+      label="order: append · last 35 lines" ;;
+  esac
+  [ "$src" = "marker" ] || label="$label · NO order MARKER: direction inferred from dated headings"
   REASON="$REASON
-──────── $f  (total ${total} lines · showing last 35) ────────
-$(tail -35 "$f" 2>/dev/null)
+──────── $f  (total ${total} lines · ${label}) ────────
+$excerpt
 "
 done
 unset IFS

@@ -32,7 +32,7 @@ the documentation does not claim that malformed input is denied.
 ## Layer four: write guards
 
 - `security/hook-protected-write-guard.sh` snapshots a protected file before a Write or Edit and blocks a single edit that would shrink a file of at least 1 KB to less than half its size, which forces a large rewrite into reviewable steps.
-- `security/hook-md-append-guard.sh` denies the first shell append to a canonical Markdown file in each session and returns that file's current tail, so the agent reads current state before writing; the retry goes through. It is a forced read, not a semantic check for stale or duplicate claims.
+- `security/hook-md-append-guard.sh` denies the first shell append to a canonical Markdown file in each session and returns that file's newest region, head or tail according to its `order:` marker, so the agent reads current state before writing; the retry goes through. It is a forced read, not a semantic check for stale or duplicate claims.
 - `security/adversarial-gate.py` records each round of the red-stakes review loop and decides when the loop stops; it is a review-loop helper, not an access control, and the model loop itself is private. It is described in the [eval harness](https://github.com/dyjhhh/agent-eval-gates/blob/main/docs/eval-harness.md).
 
 ## Secrets
